@@ -48,7 +48,56 @@ app.post('/upload', upload.single('audio'), function (req, res, next) {
     var filename = req.file.filename;
     console.log("processing file " + filename);
     
+    var options = {
+        headers: 
+       { "Content-Type": "audio/wav",
+         "Transfer-Encoding": "chunked"},
+       username: config.IBM_USER,
+       password: config.IBM_PASS
+     }
+    needle.post(config.url, fs.createReadStream("uploads/" + filename), options, function(err, resp) {
+        // console.dir(resp.body) 
+        console.dir(resp.body.results)
+        // res.send(resp.body);
+        var spk = resp.body["speaker_labels"];
+        console.dir(spk)
+        
+        var by_utterance = []
+        try {
+            var word_time = {}
+            word_time = {}
+            // res.send(resp.body.results);
+            resp.body.results.forEach(function(thing) {
+                
+            
+                thing.alternatives[0].timestamps.forEach(function (item) {
+                    word_time[item[1]] =   item[0];
+                })
+            });
+            
+            spk.forEach(function (item) {
+                var start = item.from;
+                var speaker = item.speaker;
+                var index = by_utterance.length - 1
+                if (by_utterance[index] == null || by_utterance[index].speaker != speaker) {
+                    console.log(speaker)
+                    by_utterance.push({});
+                    curObj = by_utterance[by_utterance.length - 1];
+                    curObj.speaker = speaker;
+                    curObj.utterance = word_time[start];
+                } else {
+                    by_utterance[index].utterance += " " + word_time[start];
+                }
+            });
 
+            res.send({"status" : "FAILURE", "utter" : by_utterance, "labels" :resp.body});
+            return;
+            
+        } catch (e) {
+            res.send({"status" : "FAILURE"});
+            return;
+        }
+    });		 
 });
 
 
@@ -79,20 +128,7 @@ client.on('connect', function() {
   console.log('connected Redis');
 });
 
-var options = {
-       headers: 
-      { "Content-Type": "audio/flac",
-        "Transfer-Encoding": "chunked"},
-      username: config.IBM_USER,
-      password: config.IBM_PASS
-    }
-    
 
-needle.post(config.url, fs.createReadStream('audio-file.flac'), options, function(err, resp) {
-    // console.dir(resp.body)
-    
-    console.dir(resp.body.results[0].alternatives)
-});		  
     
 
 
